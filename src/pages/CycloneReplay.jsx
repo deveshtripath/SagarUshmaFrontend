@@ -1,306 +1,580 @@
-import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, Legend, Area, AreaChart,
+  ComposedChart, LineChart, Area, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ReferenceLine, ResponsiveContainer, Legend,
 } from 'recharts';
-import { CYCLONE_TRACKS, synthesizeTrackConditions } from '../api.js';
+import FieldPlayer from '../components/replay/FieldPlayer.jsx';
+import { STORMS, IMD_CATS, imdCategory } from '../components/replay/cyclones.jsx';
+import { loadLand } from '../components/replay/land.jsx';
+import { buildScene, LAYERS, LAYER_BY_ID, stormAt, sampleAt, formatTime } from '../components/replay/scene.jsx';
+import { cmapGradientCss } from '../components/replay/colormaps.js';
 import './CycloneReplay.css';
 
-const METRIC_DEFS = {
-  tchp:      { label: 'TCHP',      unit: 'kJ/cm²', color: '#ff4444', desc: 'Tropical Cyclone Heat Potential' },
-  d26:       { label: 'D26',       unit: 'm',       color: '#ff9500', desc: 'Depth of 26°C isotherm' },
-  mld:       { label: 'MLD',       unit: 'm',       color: '#00e5c0', desc: 'Mixed Layer Depth' },
-  sst:       { label: 'SST',       unit: '°C',      color: '#ff6b6b', desc: 'Sea Surface Temperature' },
-  intensity: { label: 'Intensity', unit: 'kt',      color: '#a78bfa', desc: 'Wind Speed' },
+const SPEEDS = [0.5, 1, 2, 4];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const minus = (s) => s.replace('-', '−');
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const Icon = {
+  play: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>,
+  pause: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor" /></svg>,
+  restart: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM9.5 12 19 5.5v13z" fill="currentColor" /></svg>,
+  back: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6 5 12l7 6zM19 6l-7 6 7 6z" fill="currentColor" /></svg>,
+  fwd: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 6 7 6-7 6zM5 6l7 6-7 6z" fill="currentColor" /></svg>,
+  camera: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><circle cx="12" cy="13" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>,
+  video: <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="12.5" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="m15.5 10.5 5-3v9l-5-3z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>,
 };
 
-function intensityToRadius(kt) {
-  return Math.max(6, Math.min(22, kt / 9));
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function pickMime() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const options = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  return options.find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
 }
 
-function intensityToColor(kt) {
-  if (kt < 35) return '#00c8ff';
-  if (kt < 65) return '#00e5c0';
-  if (kt < 95) return '#ffb347';
-  if (kt < 135) return '#ff6b6b';
-  return '#ff2222';
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-const CustomTooltip = ({ active, payload, label }) => {
+// Pre-rendered SST replays in public/videos/, one per storm (same renderer as the player, 2× speed)
+function stormVideo(storm) {
+  const base = `${import.meta.env.BASE_URL}videos/SagarUshma_${storm.name}_${storm.year}_sst`;
+  return { src: `${base}.mp4`, poster: `${base}.jpg`, file: `SagarUshma_${storm.name}_${storm.year}_sst.mp4` };
+}
+
+function dayTicks(scene) {
+  const out = [];
+  const end = scene.epoch + scene.tLast * 3.6e6;
+  for (let ms = Math.ceil(scene.epoch / 864e5) * 864e5; ms <= end; ms += 864e5) out.push((ms - scene.epoch) / 3.6e6);
+  return out;
+}
+
+function dateRange(storm) {
+  const a = new Date(storm.track[0][0]);
+  const b = new Date(storm.track[storm.track.length - 1][0]);
+  const m = MONTHS[a.getUTCMonth()];
+  return a.getUTCMonth() === b.getUTCMonth()
+    ? `${a.getUTCDate()}–${b.getUTCDate()} ${m} ${a.getUTCFullYear()}`
+    : `${a.getUTCDate()} ${m} – ${b.getUTCDate()} ${MONTHS[b.getUTCMonth()]} ${a.getUTCFullYear()}`;
+}
+
+// ── Charts (memoised: they only re-render when the hour changes) ──────────────
+const axisTick = { fill: '#4a7a9b', fontSize: 10 };
+
+function ChartTip({ active, payload, label, fmtTime }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="cr-tooltip">
-      <div className="cr-tooltip__label">{label}</div>
-      {payload.map(p => (
-        <div key={p.dataKey} className="cr-tooltip__row">
+    <div className="cr-tip">
+      <div className="cr-tip__time">{fmtTime(label)}</div>
+      {payload.map((p) => (
+        <div key={p.dataKey} className="cr-tip__row">
           <span style={{ color: p.color }}>{p.name}</span>
-          <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-            {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
-          </span>
+          <strong>{p.value ?? '—'}</strong>
         </div>
       ))}
     </div>
   );
-};
+}
 
+const WarmPoolChart = memo(function WarmPoolChart({ data, ticks, fmtDay, fmtTime, cursor, showCursor }) {
+  return (
+    <ResponsiveContainer width="100%" height={250}>
+      <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -6 }}>
+        <defs>
+          <linearGradient id="crPool" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ff8a3d" stopOpacity={0.5} />
+            <stop offset="100%" stopColor="#ff8a3d" stopOpacity={0.03} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
+        <XAxis dataKey="t" type="number" domain={[0, 'dataMax']} ticks={ticks} tickFormatter={fmtDay} tick={axisTick} />
+        <YAxis yAxisId="h" tick={axisTick} width={48} label={{ value: 'kJ/cm²', angle: -90, position: 'insideLeft', fill: '#4a7a9b', fontSize: 10, dx: 10 }} />
+        <YAxis yAxisId="w" orientation="right" tick={axisTick} width={40} label={{ value: 'kt', angle: 90, position: 'insideRight', fill: '#4a7a9b', fontSize: 10 }} />
+        <Tooltip content={<ChartTip fmtTime={fmtTime} />} />
+        <Legend wrapperStyle={{ fontSize: 11, color: '#7ba7c8', paddingTop: 6 }} />
+        <Area yAxisId="h" type="monotone" dataKey="tchpPre" name="TCHP before the storm" stroke="#ff8a3d" strokeWidth={2} fill="url(#crPool)" isAnimationActive={false} />
+        <Line yAxisId="h" type="monotone" dataKey="tchpPost" name="TCHP after it passed" stroke="#5ed3ff" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+        <Line yAxisId="w" type="monotone" dataKey="vmax" name="Wind speed" stroke="#c9a7ff" strokeWidth={2} dot={false} isAnimationActive={false} />
+        {showCursor && <ReferenceLine yAxisId="h" x={cursor} stroke="rgba(232,244,255,0.75)" strokeDasharray="2 3" />}
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+});
+
+const StructureChart = memo(function StructureChart({ data, ticks, fmtDay, fmtTime, cursor, showCursor }) {
+  return (
+    <ResponsiveContainer width="100%" height={250}>
+      <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -6 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
+        <XAxis dataKey="t" type="number" domain={[0, 'dataMax']} ticks={ticks} tickFormatter={fmtDay} tick={axisTick} />
+        <YAxis reversed tick={axisTick} width={48} domain={[0, 'auto']} label={{ value: 'Depth (m)', angle: -90, position: 'insideLeft', fill: '#4a7a9b', fontSize: 10, dx: 10 }} />
+        <Tooltip content={<ChartTip fmtTime={fmtTime} />} />
+        <Legend wrapperStyle={{ fontSize: 11, color: '#7ba7c8', paddingTop: 6 }} />
+        <Line type="monotone" dataKey="d26" name="26 °C isotherm (D26)" stroke="#ffb347" strokeWidth={2} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="mld" name="Mixed layer before" stroke="#4cf0c2" strokeWidth={2} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="mldPost" name="Mixed layer after" stroke="#4cf0c2" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+        {showCursor && <ReferenceLine x={cursor} stroke="rgba(232,244,255,0.75)" strokeDasharray="2 3" />}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+});
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function CycloneReplay() {
-  const [selectedId, setSelectedId] = useState('mocha_2023');
-  const [activeMetric, setActiveMetric] = useState('tchp');
-  const [stepIdx, setStepIdx] = useState(0);
+  const [stormId, setStormId] = useState('mocha_2023');
+  const [layerId, setLayerId] = useState('tchp');
+  const [showVectors, setShowVectors] = useState(true);
   const [playing, setPlaying] = useState(false);
-  const [conditions, setConditions] = useState(null);
-
-  const track = CYCLONE_TRACKS[selectedId];
+  const [speed, setSpeed] = useState(1);
+  const [land, setLand] = useState(null);
+  const [landError, setLandError] = useState(null);
+  const [t, setT] = useState(-12);
+  const [stats, setStats] = useState({ minSST: 0, minTCHP: 0, maxMLD: 0 });
+  const [recording, setRecording] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const playerRef = useRef(null);
+  const recRef = useRef(null);
 
   useEffect(() => {
-    setConditions(synthesizeTrackConditions(track));
-    setStepIdx(0);
+    loadLand().then(setLand).catch((e) => setLandError(e.message));
+  }, []);
+
+  const storm = STORMS[stormId];
+  const scene = useMemo(() => (land ? buildScene(storm, land) : null), [storm, land]);
+
+  useEffect(() => {
     setPlaying(false);
-  }, [selectedId]);
+    if (scene) setT(scene.tStart);
+  }, [scene]);
 
-  // Playback
   useEffect(() => {
-    if (!playing || !conditions) return;
-    if (stepIdx >= conditions.length - 1) { setPlaying(false); return; }
-    const t = setTimeout(() => setStepIdx(i => i + 1), 900);
-    return () => clearTimeout(t);
-  }, [playing, stepIdx, conditions]);
+    if (!notice) return undefined;
+    const id = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
-  if (!conditions) return null;
+  // ── Transport ───────────────────────────────────────────────────────────────
+  const seek = useCallback((value) => {
+    if (!scene) return;
+    const v = clamp(value, scene.tStart, scene.tEnd);
+    playerRef.current?.seek(v);
+    setT(v);
+  }, [scene]);
 
-  const current = conditions[stepIdx];
-  const mapCenter = [
-    conditions.reduce((s, p) => s + p.lat, 0) / conditions.length,
-    conditions.reduce((s, p) => s + p.lng, 0) / conditions.length,
-  ];
+  const togglePlay = useCallback(() => {
+    if (!scene) return;
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    const cur = playerRef.current?.getTime() ?? t;
+    if (cur >= scene.tEnd - 0.01) seek(scene.tStart);
+    setPlaying(true);
+  }, [scene, playing, t, seek]);
 
-  const chartData = conditions.map((c, i) => ({
-    date: c.date.slice(5),
-    TCHP: c.tchp,
-    D26: c.d26,
-    MLD: c.mld,
-    SST: c.sst,
-    Intensity: c.intensity,
-    active: i <= stepIdx,
-  }));
+  const step = useCallback((dh) => seek((playerRef.current?.getTime() ?? t) + dh), [seek, t]);
 
-  const polylinePoints = conditions.map(c => [c.lat, c.lng]);
+  const handleTick = useCallback((time, s) => {
+    setT(time);
+    setStats(s);
+  }, []);
+
+  const stopRecording = useCallback((cancel) => {
+    const job = recRef.current;
+    if (!job) return;
+    job.cancelled = cancel;
+    setPlaying(false);
+    if (job.recorder.state !== 'inactive') job.recorder.stop();
+  }, []);
+
+  const handleEnded = useCallback(() => {
+    setPlaying(false);
+    if (recRef.current) setTimeout(() => stopRecording(false), 400);
+  }, [stopRecording]);
+
+  function startRecording() {
+    const canvas = playerRef.current?.getCanvas();
+    const mime = pickMime();
+    if (!scene || !canvas?.captureStream || mime === null) {
+      setNotice('Video export needs a recent Chrome, Edge or Firefox.');
+      return;
+    }
+    const stream = canvas.captureStream(30);
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : undefined);
+    } catch (e) {
+      setNotice(`Couldn't start recording: ${e.message}`);
+      return;
+    }
+    const job = { recorder, chunks: [], cancelled: false, mime: recorder.mimeType || mime || 'video/webm' };
+    recorder.ondataavailable = (e) => { if (e.data?.size) job.chunks.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach((tr) => tr.stop());
+      recRef.current = null;
+      setRecording(false);
+      if (job.cancelled || !job.chunks.length) {
+        if (job.cancelled) setNotice('Recording cancelled.');
+        return;
+      }
+      const ext = job.mime.includes('mp4') ? 'mp4' : 'webm';
+      download(new Blob(job.chunks, { type: job.mime }), `SagarUshma_${storm.name}_${storm.year}_${layerId}.${ext}`);
+      setNotice(`Video saved as ${ext.toUpperCase()}.`);
+    };
+    recRef.current = job;
+    seek(scene.tStart);
+    recorder.start(250);
+    setRecording(true);
+    setPlaying(true);
+  }
+
+  function saveFrame() {
+    const canvas = playerRef.current?.getCanvas();
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (blob) download(blob, `SagarUshma_${storm.name}_${storm.year}_${layerId}_T${Math.round(t)}h.png`);
+    }, 'image/png');
+  }
+
+  // Stop any recording if the page unmounts
+  useEffect(() => () => {
+    const job = recRef.current;
+    if (job && job.recorder.state !== 'inactive') {
+      job.cancelled = true;
+      job.recorder.stop();
+    }
+  }, []);
+
+  // Keyboard: space = play/pause, ←/→ = ∓3 h
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.closest?.('input, select, textarea, button')) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === 'ArrowRight') step(3);
+      else if (e.key === 'ArrowLeft') step(-3);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [togglePlay, step]);
+
+  // ── Derived readouts ────────────────────────────────────────────────────────
+  const now = scene ? stormAt(scene, t) : null;
+  const core = now ? sampleAt(scene, now.lat, now.lon, t) : null;
+  const cat = now ? imdCategory(now.vmax) : null;
+  const layer = LAYER_BY_ID[layerId];
+
+  const chartProps = useMemo(() => {
+    if (!scene) return null;
+    return {
+      data: scene.series,
+      ticks: dayTicks(scene),
+      fmtDay: (h) => {
+        const d = new Date(scene.epoch + h * 3.6e6);
+        return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+      },
+      fmtTime: (h) => formatTime(scene, h),
+    };
+  }, [scene]);
+  const cursor = scene ? clamp(Math.round(t), 0, scene.tLast) : 0;
+  const showCursor = !!scene && t >= 0 && t <= scene.tLast;
+
+  const span = scene ? scene.tEnd - scene.tStart : 1;
+  const pct = (h) => `${(((h - (scene?.tStart ?? 0)) / span) * 100).toFixed(2)}%`;
+  const atStart = scene && t <= scene.tStart + 0.01;
+  const atEnd = scene && t >= scene.tEnd - 0.01;
+  const relLabel = !scene ? '' : t < 0
+    ? `Genesis in ${Math.ceil(-t)} h`
+    : t <= scene.tLast ? `T+${Math.floor(t)} h since genesis` : `${Math.floor(t - scene.tLast)} h after the last fix`;
 
   return (
     <div className="page cr-page">
-      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-header__title">🌀 Cyclone Heat Potential Replay</h1>
           <p className="page-header__subtitle">
-            Replay real cyclone tracks with reconstructed TCHP, D26, and MLD profiles.
-            Visualize the warm subsurface pool each storm crossed — directly relevant to intensity forecasting.
+            Watch each storm cross the upper ocean: the warm pool it fed on, the cold wake it left behind,
+            and the currents it set spinning. Export any replay as a video.
           </p>
         </div>
         <div className="page-header__tag">🎯 INCOIS Mandate</div>
       </div>
 
-      {/* Storm selector */}
-      <div className="cr-selector-row">
-        {Object.entries(CYCLONE_TRACKS).map(([id, tc]) => (
-          <button
-            key={id}
-            className={`cr-storm-btn ${selectedId === id ? 'cr-storm-btn--active' : ''}`}
-            style={{ '--storm-color': tc.color }}
-            onClick={() => setSelectedId(id)}
-          >
-            <span className="cr-storm-dot" style={{ background: tc.color }} />
-            <span className="cr-storm-name">{tc.name}</span>
-            <span className="cr-storm-cat">{tc.peak_cat}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Map + metrics side by side */}
-      <div className="cr-main">
-        {/* Map */}
-        <div className="card cr-map-card">
-          <div className="card__title">Track & Warm Pool</div>
-          <div style={{ borderRadius: 12, overflow: 'hidden' }}>
-            <MapContainer
-              center={mapCenter}
-              zoom={5}
-              style={{ height: '380px', width: '100%' }}
-              key={selectedId}
-            >
-              <TileLayer
-                attribution='&copy; OpenStreetMap'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {/* Full track as grey */}
-              <Polyline positions={polylinePoints} color="rgba(255,255,255,0.2)" weight={2} dashArray="4 4" />
-              {/* Active track */}
-              <Polyline
-                positions={conditions.slice(0, stepIdx + 1).map(c => [c.lat, c.lng])}
-                color={track.color}
-                weight={3}
-              />
-              {/* All points */}
-              {conditions.map((c, i) => (
-                <CircleMarker
-                  key={i}
-                  center={[c.lat, c.lng]}
-                  radius={intensityToRadius(c.intensity)}
-                  pathOptions={{
-                    fillColor: i <= stepIdx ? intensityToColor(c.intensity) : 'rgba(100,150,180,0.3)',
-                    fillOpacity: i <= stepIdx ? 0.85 : 0.4,
-                    color: i === stepIdx ? '#ffffff' : 'transparent',
-                    weight: i === stepIdx ? 2 : 0,
-                  }}
-                >
-                  <Tooltip sticky>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.6, color: '#e8f4ff', background: 'transparent' }}>
-                      <b>{c.date}</b><br />
-                      💨 {c.intensity} kt<br />
-                      🌡️ SST: {c.sst}°C<br />
-                      🔥 TCHP: {c.tchp} kJ/cm²<br />
-                      📏 D26: {c.d26} m
-                    </div>
-                  </Tooltip>
-                </CircleMarker>
-              ))}
-            </MapContainer>
-          </div>
-
-          {/* Playback controls */}
-          <div className="cr-playback">
-            <button className="btn btn--primary" onClick={() => { setStepIdx(0); setPlaying(false); }}>⏮</button>
+      {/* Storm picker */}
+      <div className="cr-storms" role="radiogroup" aria-label="Cyclone">
+        {Object.values(STORMS).map((s) => {
+          const pc = IMD_CATS.find((c) => c.code === s.peak);
+          const active = s.id === stormId;
+          return (
             <button
-              className="btn btn--primary"
-              onClick={() => setPlaying(p => !p)}
+              key={s.id}
+              role="radio"
+              aria-checked={active}
+              className={`cr-storm${active ? ' is-active' : ''}`}
+              style={{ '--storm': pc.color }}
+              onClick={() => setStormId(s.id)}
+              disabled={recording}
             >
-              {playing ? '⏸ Pause' : '▶ Play'}
+              <span className="cr-storm__name">{s.name} <span className="cr-storm__year">{s.year}</span></span>
+              <span className="cr-storm__meta">{s.basin}</span>
+              <span className="cr-storm__peak">Peak {s.peak}</span>
             </button>
-            <button className="btn btn--primary" onClick={() => setStepIdx(i => Math.min(i + 1, conditions.length - 1))}>⏭</button>
+          );
+        })}
+      </div>
 
-            <div className="cr-step-info">
-              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Step</span>
-              <input
-                type="range"
-                min={0} max={conditions.length - 1}
-                value={stepIdx}
-                onChange={e => { setPlaying(false); setStepIdx(+e.target.value); }}
-                className="cr-slider"
-              />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--cyan)' }}>
-                {current.date}
-              </span>
+      <div className="cr-stage">
+        {/* Player */}
+        <section className="cr-player" aria-label="Replay player">
+          <div className="cr-player__bar">
+            <div className="cr-layers" role="tablist" aria-label="Field shown">
+              {LAYERS.map((l) => (
+                <button
+                  key={l.id}
+                  role="tab"
+                  aria-selected={l.id === layerId}
+                  className={`cr-layer${l.id === layerId ? ' is-active' : ''}`}
+                  onClick={() => setLayerId(l.id)}
+                  title={l.long}
+                >
+                  <span className="cr-layer__swatch" style={{ background: cmapGradientCss(l.cmap) }} />
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <label className="cr-switch">
+              <input type="checkbox" checked={showVectors} onChange={(e) => setShowVectors(e.target.checked)} />
+              <span className="cr-switch__track" aria-hidden="true" />
+              Current arrows
+            </label>
+          </div>
+
+          <div className="cr-screen">
+            <FieldPlayer
+              ref={playerRef}
+              scene={scene}
+              layerId={layerId}
+              showVectors={showVectors}
+              playing={playing}
+              speed={speed}
+              onTick={handleTick}
+              onEnded={handleEnded}
+            />
+            {!scene && (
+              <div className="cr-screen__status">
+                {landError ? `Couldn't load the coastline data: ${landError}` : 'Preparing ocean fields…'}
+              </div>
+            )}
+            {scene && !playing && !recording && (atStart || atEnd) && (
+              <button className="cr-bigplay" onClick={togglePlay}>
+                <span className="cr-bigplay__icon">{Icon.play}</span>
+                {atEnd ? 'Replay' : `Play ${storm.name}`}
+              </button>
+            )}
+            {recording && (
+              <div className="cr-rec" role="status">
+                <span className="cr-rec__dot" /> Recording
+              </div>
+            )}
+          </div>
+
+          <div className="cr-timeline">
+            <input
+              type="range"
+              className="cr-range"
+              min={scene?.tStart ?? 0}
+              max={scene?.tEnd ?? 1}
+              step={0.5}
+              value={t}
+              disabled={!scene || recording}
+              onChange={(e) => seek(+e.target.value)}
+              aria-label="Replay time"
+              style={scene ? { '--p': pct(t), '--a': pct(0), '--b': pct(scene.tLast) } : undefined}
+            />
+          </div>
+
+          <div className="cr-transport">
+            <div className="cr-transport__buttons">
+              <button className="cr-icon-btn" onClick={() => seek(scene?.tStart ?? 0)} disabled={!scene || recording} aria-label="Back to start" title="Back to start">{Icon.restart}</button>
+              <button className="cr-icon-btn" onClick={() => step(-6)} disabled={!scene || recording} aria-label="Back 6 hours" title="Back 6 hours (←)">{Icon.back}</button>
+              <button className="cr-play" onClick={togglePlay} disabled={!scene || recording} aria-label={playing ? 'Pause' : 'Play'} title="Play / pause (space)">
+                {playing ? Icon.pause : Icon.play}
+              </button>
+              <button className="cr-icon-btn" onClick={() => step(6)} disabled={!scene || recording} aria-label="Forward 6 hours" title="Forward 6 hours (→)">{Icon.fwd}</button>
+            </div>
+
+            <div className="cr-readout-time">
+              <span className="cr-readout-time__clock">{scene ? formatTime(scene, t) : '—'}</span>
+              <span className="cr-readout-time__rel">{relLabel}</span>
+            </div>
+
+            <div className="cr-speed" role="radiogroup" aria-label="Playback speed">
+              {SPEEDS.map((s) => (
+                <button key={s} role="radio" aria-checked={speed === s} className={`cr-speed__opt${speed === s ? ' is-active' : ''}`} onClick={() => setSpeed(s)}>
+                  {s}×
+                </button>
+              ))}
+            </div>
+
+            <div className="cr-export">
+              <button className="cr-action" onClick={saveFrame} disabled={!scene || recording}>
+                {Icon.camera} Save frame
+              </button>
+              {recording ? (
+                <button className="cr-action cr-action--rec" onClick={() => stopRecording(true)}>Cancel recording</button>
+              ) : (
+                <button className="cr-action cr-action--primary" onClick={startRecording} disabled={!scene}>
+                  {Icon.video} Export video
+                </button>
+              )}
             </div>
           </div>
-        </div>
+          <div className="cr-footnote">
+            <span className="cr-footnote__swatch" /> Shaded part of the timeline = storm active.
+            {notice && <span className="cr-notice" role="status">{notice}</span>}
+          </div>
+        </section>
 
-        {/* Live metrics panel */}
-        <div className="cr-metrics-col">
-          <div className="card">
-            <div className="card__title">Current Position Metrics</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { key: 'tchp',      val: current.tchp,      color: '#ff4444', icon: '🔥' },
-                { key: 'd26',       val: current.d26,       color: '#ff9500', icon: '📏' },
-                { key: 'mld',       val: current.mld,       color: '#00e5c0', icon: '🌊' },
-                { key: 'sst',       val: current.sst,       color: '#ff6b6b', icon: '🌡️' },
-                { key: 'intensity', val: current.intensity, color: '#a78bfa', icon: '💨' },
-              ].map(({ key, val, color, icon }) => {
-                const def = METRIC_DEFS[key];
-                return (
-                  <div key={key} className="cr-metric-row">
-                    <span className="cr-metric-icon">{icon}</span>
-                    <div className="cr-metric-body">
-                      <div className="cr-metric-label">{def.label}</div>
-                      <div className="cr-metric-desc">{def.desc}</div>
-                    </div>
-                    <div className="cr-metric-val" style={{ color }}>
-                      {val}
-                      <span className="cr-metric-unit">{def.unit}</span>
-                    </div>
+        {/* Side panel */}
+        <aside className="cr-side">
+          <div className="cr-card">
+            <div className="cr-card__head">
+              <h2 className="cr-card__title">Cyclone {storm.name}</h2>
+              <span className="cr-card__sub">{dateRange(storm)}</span>
+            </div>
+            <dl className="cr-facts">
+              <div><dt>Basin</dt><dd>{storm.basin}</dd></div>
+              <div><dt>Landfall</dt><dd>{storm.landfall}</dd></div>
+            </dl>
+          </div>
+
+          <div className="cr-card">
+            <h2 className="cr-card__title">Under the storm</h2>
+            {now ? (
+              <>
+                <div className="cr-cat" style={{ '--cat': cat.color }}>
+                  <div>
+                    <div className="cr-cat__code">{cat.code}</div>
+                    <div className="cr-cat__name">{cat.name}</div>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="cr-cat__wind">{Math.round(now.vmax)}<small>kt</small></div>
+                </div>
+                {core ? (
+                  <dl className="cr-readout">
+                    <div><dt>Heat potential ahead of the core</dt><dd>{core.pre.tchp.toFixed(0)}<small>kJ/cm²</small></dd></div>
+                    <div><dt>26 °C isotherm depth</dt><dd>{core.pre.d26.toFixed(0)}<small>m</small></dd></div>
+                    <div><dt>Mixed layer depth</dt><dd>{core.pre.mld.toFixed(0)}<small>m</small></dd></div>
+                    <div>
+                      <dt>Sea surface temperature</dt>
+                      <dd>
+                        {core.sst.toFixed(1)}<small>°C</small>
+                        {core.sst - core.pre.sst < -0.05 && (
+                          <span className="cr-delta">{minus((core.sst - core.pre.sst).toFixed(1))}</span>
+                        )}
+                      </dd>
+                    </div>
+                    <div><dt>Moving at</dt><dd>{(now.trans * 3.6).toFixed(0)}<small>km/h</small></dd></div>
+                  </dl>
+                ) : (
+                  <p className="cr-muted">The centre is over land now, cut off from the ocean’s heat.</p>
+                )}
+              </>
+            ) : (
+              <p className="cr-muted">
+                {t < 0
+                  ? 'This is the ocean before genesis. Press play to bring in the storm.'
+                  : 'The storm has dissipated. Its cold wake keeps recovering for weeks.'}
+              </p>
+            )}
           </div>
 
+          <div className="cr-card">
+            <h2 className="cr-card__title">Cold wake so far</h2>
+            <dl className="cr-readout">
+              <div><dt>Largest SST drop</dt><dd className="is-cool">{minus(stats.minSST.toFixed(1))}<small>°C</small></dd></div>
+              <div><dt>Largest TCHP loss</dt><dd className="is-cool">{minus(stats.minTCHP.toFixed(0))}<small>kJ/cm²</small></dd></div>
+              <div><dt>Deepest mixing</dt><dd>+{stats.maxMLD.toFixed(0)}<small>m</small></dd></div>
+            </dl>
+          </div>
+
+          <div className="cr-card">
+            <h2 className="cr-card__title">Track colours</h2>
+            <ul className="cr-legend">
+              {IMD_CATS.map((c) => (
+                <li key={c.code}>
+                  <span className="cr-legend__swatch" style={{ background: c.color }} />
+                  <span className="cr-legend__code">{c.code}</span>
+                  <span className="cr-legend__name">{c.name}</span>
+                  <span className="cr-legend__min">≥{c.min} kt</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+      </div>
+
+      {/* Pre-rendered replay video for the selected storm */}
+      <div className="card cr-video">
+        <div className="cr-video__head">
+          <div>
+            <div className="card__title">Replay video · Cyclone {storm.name} {storm.year}</div>
+            <p className="cr-chart-note">
+              Sea surface temperature from genesis to dissipation, {dateRange(storm)}, with surface currents and the IMD-coloured track.
+            </p>
+          </div>
+          <a className="cr-action" href={stormVideo(storm).src} download={stormVideo(storm).file}>
+            {Icon.video} Download MP4
+          </a>
+        </div>
+        <video
+          key={storm.id}
+          className="cr-video__player"
+          src={stormVideo(storm).src}
+          poster={stormVideo(storm).poster}
+          controls
+          playsInline
+          preload="metadata"
+        />
+      </div>
+
+      {chartProps && (
+        <div className="grid-2">
           <div className="card">
-            <div className="card__title">Track Info</div>
-            <div className="cr-track-info">
-              <div><span className="cr-info-label">Storm</span><span className="cr-info-val">{track.name}</span></div>
-              <div><span className="cr-info-label">Category</span><span className="cr-info-val" style={{ color: track.color }}>{track.peak_cat}</span></div>
-              <div><span className="cr-info-label">Region</span><span className="cr-info-val">{track.description.split('—')[1]?.trim()}</span></div>
-              <div><span className="cr-info-label">Year</span><span className="cr-info-val">{track.year}</span></div>
-            </div>
+            <div className="card__title">Warm pool along the track</div>
+            <p className="cr-chart-note">Heat available under the core before the storm, what was left after it passed, and the wind speed.</p>
+            <WarmPoolChart {...chartProps} cursor={cursor} showCursor={showCursor} />
+          </div>
+          <div className="card">
+            <div className="card__title">Upper-ocean structure along the track</div>
+            <p className="cr-chart-note">How deep the warm water and the mixed layer reached under the core. Depth increases downward.</p>
+            <StructureChart {...chartProps} cursor={cursor} showCursor={showCursor} />
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Charts */}
-      <div className="grid-2">
-        {/* TCHP over track */}
-        <div className="card">
-          <div className="card__title">TCHP along Track</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="tchpGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff4444" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#ff4444" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
-              <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-              <RTooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="TCHP" stroke="#ff4444" fill="url(#tchpGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* D26 + MLD */}
-        <div className="card">
-          <div className="card__title">D26 & MLD along Track</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
-              <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-              <RTooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-              <Line type="monotone" dataKey="D26" stroke="#ff9500" strokeWidth={2} dot={false} name="D26 (m)" />
-              <Line type="monotone" dataKey="MLD" stroke="#00e5c0" strokeWidth={2} dot={false} name="MLD (m)" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Intensity vs TCHP scatter-like line */}
-      <div className="card">
-        <div className="card__title">Intensity vs TCHP correlation along track</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
-            <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-            <YAxis yAxisId="l" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-            <YAxis yAxisId="r" orientation="right" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-            <RTooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-            <Line yAxisId="l" type="monotone" dataKey="Intensity" stroke="#a78bfa" strokeWidth={2.5} dot={false} name="Intensity (kt)" />
-            <Line yAxisId="r" type="monotone" dataKey="TCHP" stroke="#ff4444" strokeWidth={2} dot={false} strokeDasharray="5 3" name="TCHP (kJ/cm²)" />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="card" style={{ background: 'rgba(255,68,68,0.05)', borderColor: 'rgba(255,68,68,0.2)' }}>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-          <strong style={{ color: '#ff6b6b' }}>ℹ Science note</strong> — TCHP is the heat content above the 26°C isotherm (D26).
-          A deep warm pool (high TCHP + deep D26) prevents cold upwelling from weakening the storm.
-          MLD acts as a buffer: shallow MLD means mixing quickly brings cold water up, limiting intensification.
-          ARGO floats deployed pre-storm in the warm pool provide the observational backbone for these products.
-        </div>
+      <div className="card cr-note">
+        <h2 className="cr-note__title">Reading the replay</h2>
+        <p>
+          <strong>{layer.label}</strong> is shown now. TCHP is the heat stored above the 26 °C isotherm; a deep warm pool
+          (high TCHP, deep D26) lets a storm keep drawing energy instead of churning up cold water. As the core passes,
+          mixing and upwelling pull cooler water to the surface. The cold wake is strongest to the right of the track
+          and largest under slow storms: compare Biparjoy, which crawled across the Arabian Sea, with the faster Mocha.
+          The arrows that keep turning clockwise in the wake are near-inertial currents, rotating once every 1.5–2 days
+          at these latitudes.
+        </p>
+        <p className="cr-muted">
+          Fields on this page are simulated from the best track so the replay runs without a gridded endpoint. Swap in
+          reconstructed profiles from the model through <code>src/replay/scene.js</code>.
+        </p>
       </div>
     </div>
   );
