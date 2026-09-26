@@ -1,0 +1,104 @@
+.edb-page { gap: 20px; }
+
+.edb-arch-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.edb-arch-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+.edb-arch-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edb-arch-step {
+  flex: 1;
+  min-width: 140px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edb-arch-step-icon { font-size: 20px; }
+.edb-arch-step-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.edb-arch-step-desc { font-size: 10px; color: var(--text-muted); line-height: 1.5; }
+
+.edb-arch-arrow {
+  font-size: 18px;
+  color: var(--border-bright);
+  flex-shrink: 0;
+}
+
+.edb-event-list { display: flex; flex-direction: column; gap: 6px; }
+
+.edb-event-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ev-color);
+  border-radius: var(--radius-md);
+  transition: background 0.15s;
+}
+
+.edb-event-row:hover { background: var(--bg-card-hover); }
+
+.edb-event-icon { font-size: 20px; flex-shrink: 0; }
+
+.edb-event-body { flex: 1; }
+.edb-event-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.edb-event-meta { display: flex; gap: 6px; font-size: 11px; align-items: center; }
+
+.edb-event-cat {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  min-width: 50px;
+  text-align: right;
+}
+
+.edb-event-btn {
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: not-allowed;
+  font-family: var(--font-sans);
+  opacity: 0.5;
+}
+
+.edb-schema { overflow-x: auto; }
+
+.edb-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre;
+  overflow-x: auto;
+  margin-top: 10px;
+  padding: 14px;
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
