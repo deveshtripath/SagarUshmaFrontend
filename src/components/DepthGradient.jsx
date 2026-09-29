@@ -29,17 +29,22 @@ export default function DepthGradient({ byDepth }) {
   return (
     <div className="dg">
       <div className="dg__header">
-        <span className="dg__title">Depth Profile</span>
-        <div className="dg__legend">
-          <span style={{ color: 'hsl(240,90%,60%)' }}>Cold</span>
+        <div>
+          <h2 className="dg__title">Depth profile</h2>
+          <p className="dg__sub">
+            {byDepth[0].depth}–{byDepth[byDepth.length - 1].depth} m · {min.toFixed(1)}–{max.toFixed(1)} °C
+          </p>
+        </div>
+        <div className="dg__legend" aria-hidden="true">
+          <span>Cold</span>
           <div className="dg__legend-bar" style={{ background: 'linear-gradient(90deg, hsl(240,90%,50%), hsl(60,90%,50%), hsl(0,90%,50%))' }} />
-          <span style={{ color: 'hsl(0,90%,60%)' }}>Warm</span>
+          <span>Warm</span>
         </div>
       </div>
 
       <div className="dg__body">
         {/* Gradient bar */}
-        <div className="dg__bar-wrap">
+        <div className="dg__bar-wrap" aria-hidden="true">
           <div className="dg__bar" style={{ background: gradient }} />
           <div className="dg__depth-labels">
             {byDepth.map(row => (
@@ -56,9 +61,9 @@ export default function DepthGradient({ byDepth }) {
             <thead>
               <tr>
                 <th>Depth</th>
-                <th>Temp (°C)</th>
-                <th>Salinity (psu)</th>
-                <th>Heat bar</th>
+                <th className="num">Temperature (°C)</th>
+                <th className="num">Salinity (psu)</th>
+                <th><span className="dg__sr">Relative warmth</span></th>
               </tr>
             </thead>
             <tbody>
@@ -68,13 +73,13 @@ export default function DepthGradient({ byDepth }) {
                 return (
                   <tr key={row.depth}>
                     <td className="dg__td-depth">{row.depth} m</td>
-                    <td style={{ color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    <td className="num dg__td-temp">
                       {row.temperature.toFixed(2)}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--teal)' }}>
+                    <td className="num">
                       {row.salinity.toFixed(2)}
                     </td>
-                    <td>
+                    <td aria-hidden="true">
                       <div className="dg__heatbar-wrap">
                         <div className="dg__heatbar" style={{ width: `${pct}%`, background: color }} />
                       </div>

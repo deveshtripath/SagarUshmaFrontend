@@ -1,13 +1,14 @@
 .dg {
-  background: var(--grad-card);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 20px;
+  box-shadow: var(--shadow-1);
 }
 
 .dg__header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   margin-bottom: 16px;
   gap: 16px;
@@ -15,43 +16,49 @@
 }
 
 .dg__title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.dg__sub {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .dg__legend {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .dg__legend-bar {
-  width: 80px;
+  width: 96px;
   height: 6px;
   border-radius: 3px;
 }
 
 .dg__body {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  gap: 20px;
+  align-items: stretch;
 }
 
 .dg__bar-wrap {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
+  padding: 34px 0 4px;   /* aligns the ramp with the table body */
 }
 
 .dg__bar {
-  width: 20px;
-  border-radius: 8px;
-  box-shadow: 0 0 12px rgba(0,200,255,0.15);
+  width: 14px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .dg__depth-labels {
@@ -60,16 +67,11 @@
   justify-content: space-between;
 }
 
-.dg__depth-tick {
-  display: flex;
-  align-items: center;
-}
-
 .dg__depth-val {
-  font-size: 10px;
-  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .dg__table-wrap {
@@ -80,48 +82,55 @@
 .dg__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .dg__table thead th {
   text-align: left;
-  padding: 6px 10px;
-  color: var(--text-label);
-  font-weight: 600;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid var(--border);
-}
-
-.dg__table tbody tr {
-  border-bottom: 1px solid rgba(0,170,255,0.05);
-  transition: background 0.1s;
-}
-
-.dg__table tbody tr:hover { background: rgba(0,200,255,0.04); }
-
-.dg__table td {
-  padding: 7px 10px;
-}
-
-.dg__td-depth {
-  font-family: var(--font-mono);
+  padding: 8px 12px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-weight: 500;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
+
+.dg__table .num { text-align: right; }
+
+.dg__table tbody tr { border-bottom: 1px solid var(--border); }
+.dg__table tbody tr:last-child { border-bottom: none; }
+.dg__table tbody tr:hover { background: var(--bg-card-hover); }
+
+.dg__table td { padding: 8px 12px; color: var(--text-secondary); }
+
+.dg__td-depth { color: var(--text-muted); white-space: nowrap; }
+.dg__td-temp { color: var(--text-primary); font-weight: 600; }
 
 .dg__heatbar-wrap {
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-fill);
   border-radius: 3px;
   height: 6px;
   width: 100%;
-  min-width: 60px;
+  min-width: 80px;
   overflow: hidden;
 }
 
 .dg__heatbar {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.4s ease;
+  transition: width 0.4s var(--ease);
+}
+
+.dg__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .dg__bar-wrap { display: none; }
 }

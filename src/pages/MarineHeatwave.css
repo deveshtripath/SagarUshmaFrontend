@@ -1,26 +1,31 @@
 .mhw-page { gap: 20px; }
 
 .mhw-legend {
+  list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 20px;
 }
 
 .mhw-cat-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 20px;
-  font-size: 12px;
-  border-left: 3px solid var(--cat-color);
+  gap: 8px;
+  font-size: 13px;
 }
+
+.mhw-cat-pill__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--cat-color);
+}
+.mhw-cat-pill__name { font-weight: 500; color: var(--text-primary); }
+.mhw-cat-pill__range { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 .mhw-body {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 380px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -31,68 +36,95 @@
 
 .mhw-alerts {
   margin-top: 14px;
-  padding: 14px 18px;
+  padding: 16px 18px 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+.mhw-alerts .card__title { margin-bottom: 6px; }
+
+.mhw-alert-none {
+  padding: 4px 0 8px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
 }
 
 .mhw-alert-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 56px 80px 1fr;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
+  padding: 9px 0 9px 12px;
   border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--cat);
-  padding-left: 10px;
-  margin-left: -10px;
+  position: relative;
+}
+.mhw-alert-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--cat);
 }
 .mhw-alert-row:last-child { border-bottom: none; }
 
-.mhw-alert-depth { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); font-size: 13px; min-width: 40px; }
-.mhw-alert-cat { font-size: 12px; font-weight: 600; min-width: 80px; }
-.mhw-alert-anom { font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono); }
+.mhw-alert-depth { font-weight: 600; color: var(--text-primary); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.mhw-alert-cat { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.mhw-alert-anom { font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; text-align: right; }
 
-.mhw-charts-col { display: flex; flex-direction: column; gap: 14px; }
+.mhw-charts-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
 .mhw-depth-selector {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
   align-items: center;
-  padding: 12px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mhw-depth-selector__label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+
+/* Segmented control — shared with Attribution */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-fill);
+  border-radius: 9px;
 }
 
 .mhw-depth-btn {
-  padding: 5px 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  position: relative;
+  min-height: 30px;
+  padding: 4px 11px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
   color: var(--text-secondary);
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  transition: all 0.15s;
-  position: relative;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.12s, color 0.12s;
 }
 
-.mhw-depth-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-.mhw-depth-btn--active {
-  background: var(--cyan-dim);
-  border-color: var(--border-bright);
-  color: var(--cyan);
+.mhw-depth-btn:hover { color: var(--text-primary); }
+.mhw-depth-btn--active,
+.mhw-depth-btn--active:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-1), 0 0 0 0.5px var(--border);
 }
 
+/* Heatwave marker on a depth — a dot plus a screen-reader label */
 .mhw-depth-alert {
   position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 7px;
-  height: 7px;
+  top: 4px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--coral);
-  box-shadow: 0 0 6px var(--coral);
 }

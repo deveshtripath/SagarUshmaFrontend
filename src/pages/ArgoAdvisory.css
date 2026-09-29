@@ -3,17 +3,57 @@
 .aa-controls {
   display: flex;
   align-items: flex-end;
-  gap: 24px;
+  gap: 28px;
   flex-wrap: wrap;
-  padding: 14px 18px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
 }
+
+.aa-range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.aa-range-val {
+  min-width: 36px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native range, styled lightly: filled track + round thumb */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--cyan) 0 var(--p, 50%), var(--bg-fill) var(--p, 50%));
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.slider:focus-visible { outline: 2px solid var(--cyan); outline-offset: 6px; }
 
 .aa-advisory-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 260px;
+  grid-template-columns: 1fr 1fr 280px;
   gap: 14px;
 }
 
@@ -24,103 +64,96 @@
   .aa-advisory-row { grid-template-columns: 1fr; }
 }
 
-.aa-advisory-card {
+.aa-advisory-card,
+.aa-stats-card {
   border-radius: var(--radius-lg);
-  padding: 18px;
-  border: 1px solid;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-1);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* The recommendation that matters most gets the accent edge */
 .aa-advisory-card--primary {
-  background: linear-gradient(135deg, rgba(0,200,255,0.08), rgba(0,200,255,0.02));
-  border-color: rgba(0,200,255,0.35);
-  box-shadow: var(--glow-cyan);
-}
-
-.aa-advisory-card--secondary {
-  background: var(--bg-card);
-  border-color: var(--border);
+  border-color: color-mix(in srgb, var(--cyan) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cyan) 25%, transparent), var(--shadow-1);
 }
 
 .aa-advisory-tag {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--cyan);
-  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
-
-.aa-advisory-card--secondary .aa-advisory-tag { color: var(--text-secondary); }
+.aa-advisory-card--primary .aa-advisory-tag { color: var(--cyan); }
 
 .aa-advisory-coords {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  font-family: var(--font-mono);
-}
-
-.aa-coord-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .aa-coord-val {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--cyan);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .aa-advisory-sigma {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13.5px;
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .aa-advisory-sigma strong {
-  color: var(--coral);
-  font-size: 18px;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 600;
 }
+
+.aa-advisory-sigma__note { font-size: 12.5px; color: var(--text-muted); }
 
 .aa-advisory-action {
-  font-size: 10px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
   color: var(--text-muted);
-  font-style: italic;
 }
 
-.aa-stats-card {
-  background: var(--grad-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 18px;
-}
+.aa-stats-card .card__title { margin-bottom: 4px; }
 
 .aa-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 14px 12px;
 }
 
-.aa-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.aa-stat { display: flex; flex-direction: column; gap: 1px; }
 
 .aa-stat-label {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .aa-stat-val {
-  font-family: var(--font-mono);
   font-size: 18px;
-  font-weight: 700;
-  color: var(--teal);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .aa-main-grid {
@@ -134,25 +167,44 @@
   .aa-main-grid { grid-template-columns: 1fr; }
 }
 
+.aa-map { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+
 .aa-map-legend {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  font-size: 11px;
-  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
+
+.aa-map-legend__ramp {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, hsl(120, 85%, 45%), hsl(60, 85%, 45%), hsl(0, 85%, 45%));
+}
+
+.aa-map-legend__sep { width: 1px; height: 14px; background: var(--border-bright); margin: 0 4px; }
+
+/* Ring swatches match the map markers: solid = first, dashed = second */
+.aa-ring {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px dashed currentColor;
+  flex-shrink: 0;
+}
+.aa-ring--solid { border: 2.5px solid currentColor; }
 
 .aa-method-note {
   margin-top: 16px;
-  padding: 14px;
-  background: rgba(0,200,255,0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.7;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding: 14px 16px;
+  background: var(--bg-fill);
+  border-radius: var(--radius-md);
+  font-size: 13px;
 }
+.aa-method-note .note__title { font-size: 13.5px; margin-bottom: 4px; }

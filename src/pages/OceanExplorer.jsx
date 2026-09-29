@@ -2,6 +2,7 @@ import { useState } from 'react';
 import MapPicker from '../components/MapPicker.jsx';
 import DepthGradient from '../components/DepthGradient.jsx';
 import { fetchPrediction } from '../api.js';
+import { Icon } from '../components/Icons.jsx';
 import './OceanExplorer.css';
 
 function todayISO() {
@@ -9,13 +10,13 @@ function todayISO() {
 }
 
 const VAR_META = {
-  sst:       { label: 'SST',       unit: '°C',  icon: '🌡️', color: 'var(--coral)' },
-  sss:       { label: 'SSS',       unit: 'psu', icon: '🧂', color: 'var(--teal)' },
-  ssh:       { label: 'SSH',       unit: 'm',   icon: '📡', color: 'var(--cyan)' },
-  u_current: { label: 'U Current', unit: 'm/s', icon: '→',  color: 'var(--amber)' },
-  v_current: { label: 'V Current', unit: 'm/s', icon: '↑',  color: 'var(--amber)' },
-  u_wind:    { label: 'U Wind',    unit: 'm/s', icon: '💨', color: 'var(--violet)' },
-  v_wind:    { label: 'V Wind',    unit: 'm/s', icon: '💨', color: 'var(--violet)' },
+  sst:       { label: 'Surface temperature', abbr: 'SST', unit: '°C',  color: 'var(--coral)' },
+  sss:       { label: 'Surface salinity',    abbr: 'SSS', unit: 'psu', color: 'var(--teal)' },
+  ssh:       { label: 'Surface height',      abbr: 'SSH', unit: 'm',   color: 'var(--cyan)' },
+  u_current: { label: 'Current, east–west',   abbr: 'U',   unit: 'm/s', color: 'var(--amber)' },
+  v_current: { label: 'Current, north–south', abbr: 'V',   unit: 'm/s', color: 'var(--amber)' },
+  u_wind:    { label: 'Wind, east–west',      abbr: 'U',   unit: 'm/s', color: 'var(--violet)' },
+  v_wind:    { label: 'Wind, north–south',    abbr: 'V',   unit: 'm/s', color: 'var(--violet)' },
 };
 
 export default function OceanExplorer() {
@@ -55,13 +56,13 @@ export default function OceanExplorer() {
       {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-header__title">🌊 Ocean Explorer</h1>
+          <h1 className="page-header__title">Ocean Explorer</h1>
           <p className="page-header__subtitle">
-            Click anywhere on the map to retrieve real-time ocean subsurface predictions
-            — temperature, salinity, currents and wind — reconstructed from five-modality fusion.
+            Pick a point on the map to see the ocean beneath it: temperature, salinity, currents
+            and wind, reconstructed from five satellite and model inputs.
           </p>
         </div>
-        <div className="page-header__tag">⛵ INCOIS · SagarUshma</div>
+        <div className="page-header__tag">INCOIS · SagarUshma</div>
       </div>
 
       {/* Controls bar */}
@@ -79,19 +80,20 @@ export default function OceanExplorer() {
         {position && (
           <>
             <div className="coord-pill">
-              <span style={{ color: 'var(--text-muted)' }}>Lat</span>
+              <span>Lat</span>
               <span className="coord-pill__val">{position.lat.toFixed(4)}</span>
-              <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>Lng</span>
+              <span style={{ marginLeft: 6 }}>Lng</span>
               <span className="coord-pill__val">{position.lng.toFixed(4)}</span>
             </div>
-            <button className="btn btn--primary" onClick={handleRefetch} disabled={loading}>
-              {loading ? '⟳ Fetching…' : '↺ Refetch'}
+            <button className="btn btn--secondary" onClick={handleRefetch} disabled={loading}>
+              <Icon name="refresh" />
+              {loading ? 'Updating…' : 'Update for this date'}
             </button>
           </>
         )}
 
-        {loading && <span className="oe-status-text status-loading">Querying model…</span>}
-        {error && <span className="oe-status-text status-error">⚠ {error}</span>}
+        {loading && <span className="oe-status-text status-loading" role="status"><span className="spinner" /> Running the model…</span>}
+        {error && <span className="oe-status-text status-error" role="alert">Couldn’t get a prediction: {error}</span>}
       </div>
 
       {/* Map + results side-by-side */}
@@ -99,10 +101,11 @@ export default function OceanExplorer() {
         {/* Map */}
         <div className="oe-map-col">
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div className="oe-map-hint">
+            <div className={`oe-map-hint${position ? ' is-set' : ''}`}>
+              <Icon name="pin" />
               {position
-                ? `📍 Selected — ${position.lat.toFixed(4)}°N, ${position.lng.toFixed(4)}°E`
-                : '👆 Click on the map to select a point'}
+                ? `${position.lat.toFixed(4)}° N, ${position.lng.toFixed(4)}° E`
+                : 'Click the map to choose a point'}
             </div>
             <MapPicker
               position={position ? [position.lat, position.lng] : null}
@@ -116,10 +119,10 @@ export default function OceanExplorer() {
         <div className="oe-results-col">
           {!position && !loading && (
             <div className="status-empty">
-              <div className="status-empty__icon">🌐</div>
-              <p>Select a point on the map</p>
-              <p style={{ fontSize: 12, marginTop: 6, color: 'var(--text-muted)' }}>
-                Click anywhere in the ocean to fetch predictions
+              <div className="status-empty__icon"><Icon name="explorer" /></div>
+              <p className="status-empty__title">No point selected</p>
+              <p className="status-empty__hint">
+                Click anywhere in the ocean and the surface readings and depth profile appear here.
               </p>
             </div>
           )}
@@ -132,10 +135,12 @@ export default function OceanExplorer() {
                 if (val === undefined) return null;
                 return (
                   <div key={key} className="oe-var-card" style={{ '--accent': meta.color }}>
-                    <div className="oe-var-card__icon">{meta.icon}</div>
                     <div className="oe-var-card__body">
-                      <div className="oe-var-card__label">{meta.label}</div>
-                      <div className="oe-var-card__value" style={{ color: meta.color }}>
+                      <div className="oe-var-card__label">
+                        {meta.label}
+                        <span className="oe-var-card__abbr">{meta.abbr}</span>
+                      </div>
+                      <div className="oe-var-card__value">
                         {typeof val === 'number' ? val.toFixed(2) : val}
                         <span className="oe-var-card__unit">{meta.unit}</span>
                       </div>

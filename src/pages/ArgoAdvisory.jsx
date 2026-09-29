@@ -14,18 +14,18 @@ const REGIONS = {
 function sigmaToColor(sigma) {
   const t = Math.max(0, Math.min(1, (sigma - 0.3) / 0.65));
   const hue = (1 - t) * 120;
-  return `hsl(${hue}, 90%, 50%)`;
+  return `hsl(${hue}, 85%, 45%)`;
 }
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   return (
-    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-bright)', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-      <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Grid point</div>
-      <div style={{ color: 'var(--cyan)' }}>Lat: {d?.lat}°</div>
-      <div style={{ color: 'var(--cyan)' }}>Lng: {d?.lng}°</div>
-      <div style={{ color: sigmaToColor(d?.sigma), fontWeight: 700 }}>σ = {d?.sigma}</div>
+    <div className="chart-tip">
+      <div className="chart-tip__title">Grid point</div>
+      <div className="chart-tip__row"><span>Lat</span><strong>{d?.lat}°</strong></div>
+      <div className="chart-tip__row"><span>Lng</span><strong>{d?.lng}°</strong></div>
+      <div className="chart-tip__row"><span>σ</span><strong>{d?.sigma}</strong></div>
     </div>
   );
 };
@@ -55,21 +55,22 @@ export default function ArgoAdvisory() {
     <div className="page aa-page">
       <div className="page-header">
         <div>
-          <h1 className="page-header__title">🔵 ARGO Float Deployment Advisory</h1>
+          <h1 className="page-header__title">ARGO Float Advisory</h1>
           <p className="page-header__subtitle">
-            Uncertainty-driven deployment recommendations: identify the location with highest model
-            prediction uncertainty (argmax σ) subject to a minimum spacing constraint between floats.
-            MoES/INCOIS can use this directly to prioritize float deployments.
+            Where the next float teaches the model the most: the point of highest prediction
+            uncertainty (argmax σ), kept a minimum distance from the other recommendation.
+            MoES and INCOIS can use it directly to prioritise deployments.
           </p>
         </div>
-        <div className="page-header__tag">🛳️ MoES Operational</div>
+        <div className="page-header__tag">MoES operational</div>
       </div>
 
       {/* Controls */}
       <div className="aa-controls">
         <div>
-          <label className="oe-label">Region</label>
+          <label className="oe-label" htmlFor="aa-region">Region</label>
           <select
+            id="aa-region"
             className="ocean-select"
             value={region}
             onChange={e => setRegion(e.target.value)}
@@ -80,18 +81,19 @@ export default function ArgoAdvisory() {
           </select>
         </div>
         <div>
-          <label className="oe-label">Min float spacing (°)</label>
-          <input
-            type="range"
-            min={0.5} max={5} step={0.5}
-            value={spacing}
-            onChange={e => setSpacing(+e.target.value)}
-            className="cr-slider"
-            style={{ width: 120 }}
-          />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cyan)', marginLeft: 8 }}>
-            {spacing}°
-          </span>
+          <label className="oe-label" htmlFor="aa-spacing">Minimum float spacing</label>
+          <div className="aa-range-row">
+            <input
+              id="aa-spacing"
+              type="range"
+              min={0.5} max={5} step={0.5}
+              value={spacing}
+              onChange={e => setSpacing(+e.target.value)}
+              className="slider"
+              style={{ width: 160, '--p': `${((spacing - 0.5) / 4.5) * 100}%` }}
+            />
+            <output htmlFor="aa-spacing" className="aa-range-val">{spacing.toFixed(1)}°</output>
+          </div>
         </div>
       </div>
 
@@ -101,59 +103,55 @@ export default function ArgoAdvisory() {
           {/* Advisory boxes */}
           <div className="aa-advisory-row">
             <div className="aa-advisory-card aa-advisory-card--primary">
-              <div className="aa-advisory-tag">🎯 Primary Deployment</div>
+              <div className="aa-advisory-tag">
+                <span className="aa-ring aa-ring--solid" aria-hidden="true" /> Deploy first
+              </div>
               <div className="aa-advisory-coords">
-                <span className="aa-coord-label">Lat</span>
-                <span className="aa-coord-val">{advisory.primary.lat}°N</span>
-                <span className="aa-coord-label">Lng</span>
-                <span className="aa-coord-val">{advisory.primary.lng}°E</span>
+                <span className="aa-coord-val">{advisory.primary.lat}° N</span>
+                <span className="aa-coord-val">{advisory.primary.lng}° E</span>
               </div>
               <div className="aa-advisory-sigma">
-                σ = <strong>{advisory.primary.sigma}</strong>
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 8 }}>
-                  prediction uncertainty
-                </span>
+                σ <strong>{advisory.primary.sigma}</strong>
+                <span className="aa-advisory-sigma__note">prediction uncertainty</span>
               </div>
-              <div className="aa-advisory-action">argmax σ — highest information gain</div>
+              <div className="aa-advisory-action">Highest σ in the region, so the largest information gain.</div>
             </div>
 
             <div className="aa-advisory-card aa-advisory-card--secondary">
-              <div className="aa-advisory-tag">📍 Secondary Deployment</div>
+              <div className="aa-advisory-tag">
+                <span className="aa-ring" aria-hidden="true" /> Deploy second
+              </div>
               <div className="aa-advisory-coords">
-                <span className="aa-coord-label">Lat</span>
-                <span className="aa-coord-val">{advisory.secondary?.lat}°N</span>
-                <span className="aa-coord-label">Lng</span>
-                <span className="aa-coord-val">{advisory.secondary?.lng}°E</span>
+                <span className="aa-coord-val">{advisory.secondary?.lat}° N</span>
+                <span className="aa-coord-val">{advisory.secondary?.lng}° E</span>
               </div>
               <div className="aa-advisory-sigma">
-                σ = <strong>{advisory.secondary?.sigma}</strong>
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 8 }}>
-                  subject to {spacing}° spacing
-                </span>
+                σ <strong>{advisory.secondary?.sigma}</strong>
+                <span className="aa-advisory-sigma__note">at least {spacing}° from the first</span>
               </div>
-              <div className="aa-advisory-action">second-highest σ outside exclusion zone</div>
+              <div className="aa-advisory-action">Next-highest σ outside the exclusion zone.</div>
             </div>
 
             <div className="aa-stats-card">
-              <div className="card__title">Field Statistics</div>
-              <div className="aa-stats-grid">
+              <div className="card__title">Field statistics</div>
+              <dl className="aa-stats-grid">
                 <div className="aa-stat">
-                  <span className="aa-stat-label">Max σ</span>
-                  <span className="aa-stat-val">{Math.max(...field.map(p => p.sigma)).toFixed(3)}</span>
+                  <dt className="aa-stat-label">Max σ</dt>
+                  <dd className="aa-stat-val">{Math.max(...field.map(p => p.sigma)).toFixed(3)}</dd>
                 </div>
                 <div className="aa-stat">
-                  <span className="aa-stat-label">Mean σ</span>
-                  <span className="aa-stat-val">{(field.reduce((a, p) => a + p.sigma, 0) / field.length).toFixed(3)}</span>
+                  <dt className="aa-stat-label">Mean σ</dt>
+                  <dd className="aa-stat-val">{(field.reduce((a, p) => a + p.sigma, 0) / field.length).toFixed(3)}</dd>
                 </div>
                 <div className="aa-stat">
-                  <span className="aa-stat-label">Min σ</span>
-                  <span className="aa-stat-val">{Math.min(...field.map(p => p.sigma)).toFixed(3)}</span>
+                  <dt className="aa-stat-label">Min σ</dt>
+                  <dd className="aa-stat-val">{Math.min(...field.map(p => p.sigma)).toFixed(3)}</dd>
                 </div>
                 <div className="aa-stat">
-                  <span className="aa-stat-label">Grid pts</span>
-                  <span className="aa-stat-val">{field.length}</span>
+                  <dt className="aa-stat-label">Grid points</dt>
+                  <dd className="aa-stat-val">{field.length}</dd>
                 </div>
-              </div>
+              </dl>
             </div>
           </div>
 
@@ -161,8 +159,8 @@ export default function ArgoAdvisory() {
           <div className="aa-main-grid">
             {/* Uncertainty map */}
             <div className="card">
-              <div className="card__title">Uncertainty Field — {r.label}</div>
-              <div style={{ borderRadius: 10, overflow: 'hidden' }}>
+              <div className="card__title">Uncertainty field · {r.label}</div>
+              <div className="aa-map">
                 <MapContainer
                   center={r.center}
                   zoom={r.zoom}
@@ -186,8 +184,8 @@ export default function ArgoAdvisory() {
                       }}
                     >
                       <Tooltip sticky>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                          {pt.lat}°N {pt.lng}°E · σ={pt.sigma}
+                        <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>
+                          {pt.lat}° N {pt.lng}° E · σ {pt.sigma}
                         </span>
                       </Tooltip>
                     </CircleMarker>
@@ -196,46 +194,48 @@ export default function ArgoAdvisory() {
                   <CircleMarker
                     center={[advisory.primary.lat, advisory.primary.lng]}
                     radius={14}
-                    pathOptions={{ fillColor: 'transparent', color: '#ffffff', weight: 3, fillOpacity: 0 }}
+                    pathOptions={{ fillColor: 'transparent', color: '#0b1a2a', weight: 3, fillOpacity: 0 }}
                   />
                   {/* Secondary advisory */}
                   {advisory.secondary && (
                     <CircleMarker
                       center={[advisory.secondary.lat, advisory.secondary.lng]}
                       radius={10}
-                      pathOptions={{ fillColor: 'transparent', color: '#aaaaaa', weight: 2, fillOpacity: 0 }}
+                      pathOptions={{ fillColor: 'transparent', color: '#0b1a2a', weight: 2, dashArray: '4 4', fillOpacity: 0 }}
                     />
                   )}
                 </MapContainer>
               </div>
               <div className="aa-map-legend">
-                <span style={{ color: 'hsl(0,90%,50%)' }}>● High σ</span>
-                <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'linear-gradient(90deg, hsl(120,90%,50%), hsl(60,90%,50%), hsl(0,90%,50%))' }} />
-                <span style={{ color: 'hsl(120,90%,50%)' }}>● Low σ</span>
-                <span style={{ color: 'white', fontSize: 11 }}>○ Advisory</span>
+                <span>Low σ</span>
+                <div className="aa-map-legend__ramp" aria-hidden="true" />
+                <span>High σ</span>
+                <span className="aa-map-legend__sep" aria-hidden="true" />
+                <span className="aa-ring aa-ring--solid" aria-hidden="true" /> <span>First</span>
+                <span className="aa-ring" aria-hidden="true" /> <span>Second</span>
               </div>
             </div>
 
             {/* Scatter of lat/lng vs sigma */}
             <div className="card">
-              <div className="card__title">σ Distribution (lat × lng)</div>
+              <div className="card__title">σ across the grid</div>
               <ResponsiveContainer width="100%" height={300}>
-                <ScatterChart>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
-                  <XAxis dataKey="lng" name="Longitude" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} label={{ value: 'Longitude', position: 'insideBottom', fill: 'var(--text-muted)', fontSize: 10, offset: -2 }} />
-                  <YAxis dataKey="lat" name="Latitude" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
+                <ScatterChart margin={{ top: 4, right: 8, bottom: 8, left: -8 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="lng" name="Longitude" tick={{ fill: 'var(--chart-axis)', fontSize: 11 }} stroke="var(--chart-grid)" label={{ value: 'Longitude', position: 'insideBottom', fill: 'var(--chart-axis)', fontSize: 11, offset: -4 }} />
+                  <YAxis dataKey="lat" name="Latitude" tick={{ fill: 'var(--chart-axis)', fontSize: 11 }} stroke="var(--chart-grid)" />
                   <ZAxis dataKey="sigma" range={[20, 160]} name="σ" />
-                  <RTooltip content={<CustomTooltip />} />
+                  <RTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--chart-ref)' }} />
                   <Scatter
                     data={field}
                     fill="var(--cyan)"
-                    fillOpacity={0.6}
+                    fillOpacity={0.55}
                   />
                 </ScatterChart>
               </ResponsiveContainer>
 
-              <div className="aa-method-note">
-                <strong style={{ color: 'var(--cyan)' }}>Method</strong>
+              <div className="aa-method-note note">
+                <strong className="note__title">Method</strong>
                 <p>
                   The uncertainty field σ(lat, lng) is the posterior standard deviation of the
                   reconstructed subsurface temperature profile at each grid point.

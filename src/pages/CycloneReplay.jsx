@@ -67,7 +67,7 @@ function dateRange(storm) {
 }
 
 // ── Charts (memoised: they only re-render when the hour changes) ──────────────
-const axisTick = { fill: '#4a7a9b', fontSize: 10 };
+const axisTick = { fill: 'var(--chart-axis)', fontSize: 11 };
 
 function ChartTip({ active, payload, label, fmtTime }) {
   if (!active || !payload?.length) return null;
@@ -90,20 +90,20 @@ const WarmPoolChart = memo(function WarmPoolChart({ data, ticks, fmtDay, fmtTime
       <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -6 }}>
         <defs>
           <linearGradient id="crPool" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ff8a3d" stopOpacity={0.5} />
-            <stop offset="100%" stopColor="#ff8a3d" stopOpacity={0.03} />
+            <stop offset="0%" stopColor="var(--coral)" stopOpacity={0.5} />
+            <stop offset="100%" stopColor="var(--coral)" stopOpacity={0.03} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
+        <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
         <XAxis dataKey="t" type="number" domain={[0, 'dataMax']} ticks={ticks} tickFormatter={fmtDay} tick={axisTick} />
-        <YAxis yAxisId="h" tick={axisTick} width={48} label={{ value: 'kJ/cm²', angle: -90, position: 'insideLeft', fill: '#4a7a9b', fontSize: 10, dx: 10 }} />
-        <YAxis yAxisId="w" orientation="right" tick={axisTick} width={40} label={{ value: 'kt', angle: 90, position: 'insideRight', fill: '#4a7a9b', fontSize: 10 }} />
+        <YAxis yAxisId="h" tick={axisTick} width={48} label={{ value: 'kJ/cm²', angle: -90, position: 'insideLeft', fill: 'var(--chart-axis)', fontSize: 11, dx: 10 }} />
+        <YAxis yAxisId="w" orientation="right" tick={axisTick} width={40} label={{ value: 'kt', angle: 90, position: 'insideRight', fill: 'var(--chart-axis)', fontSize: 11 }} />
         <Tooltip content={<ChartTip fmtTime={fmtTime} />} />
-        <Legend wrapperStyle={{ fontSize: 11, color: '#7ba7c8', paddingTop: 6 }} />
-        <Area yAxisId="h" type="monotone" dataKey="tchpPre" name="TCHP before the storm" stroke="#ff8a3d" strokeWidth={2} fill="url(#crPool)" isAnimationActive={false} />
-        <Line yAxisId="h" type="monotone" dataKey="tchpPost" name="TCHP after it passed" stroke="#5ed3ff" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
-        <Line yAxisId="w" type="monotone" dataKey="vmax" name="Wind speed" stroke="#c9a7ff" strokeWidth={2} dot={false} isAnimationActive={false} />
-        {showCursor && <ReferenceLine yAxisId="h" x={cursor} stroke="rgba(232,244,255,0.75)" strokeDasharray="2 3" />}
+        <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)', paddingTop: 6 }} />
+        <Area yAxisId="h" type="monotone" dataKey="tchpPre" name="TCHP before the storm" stroke="var(--coral)" strokeWidth={2} fill="url(#crPool)" isAnimationActive={false} />
+        <Line yAxisId="h" type="monotone" dataKey="tchpPost" name="TCHP after it passed" stroke="var(--cyan)" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+        <Line yAxisId="w" type="monotone" dataKey="vmax" name="Wind speed" stroke="var(--violet)" strokeWidth={2} dot={false} isAnimationActive={false} />
+        {showCursor && <ReferenceLine yAxisId="h" x={cursor} stroke="var(--chart-ref)" strokeDasharray="2 3" />}
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -113,15 +113,15 @@ const StructureChart = memo(function StructureChart({ data, ticks, fmtDay, fmtTi
   return (
     <ResponsiveContainer width="100%" height={250}>
       <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -6 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,170,255,0.08)" />
+        <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
         <XAxis dataKey="t" type="number" domain={[0, 'dataMax']} ticks={ticks} tickFormatter={fmtDay} tick={axisTick} />
-        <YAxis reversed tick={axisTick} width={48} domain={[0, 'auto']} label={{ value: 'Depth (m)', angle: -90, position: 'insideLeft', fill: '#4a7a9b', fontSize: 10, dx: 10 }} />
+        <YAxis reversed tick={axisTick} width={48} domain={[0, 'auto']} label={{ value: 'Depth (m)', angle: -90, position: 'insideLeft', fill: 'var(--chart-axis)', fontSize: 11, dx: 10 }} />
         <Tooltip content={<ChartTip fmtTime={fmtTime} />} />
-        <Legend wrapperStyle={{ fontSize: 11, color: '#7ba7c8', paddingTop: 6 }} />
-        <Line type="monotone" dataKey="d26" name="26 °C isotherm (D26)" stroke="#ffb347" strokeWidth={2} dot={false} isAnimationActive={false} />
-        <Line type="monotone" dataKey="mld" name="Mixed layer before" stroke="#4cf0c2" strokeWidth={2} dot={false} isAnimationActive={false} />
-        <Line type="monotone" dataKey="mldPost" name="Mixed layer after" stroke="#4cf0c2" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
-        {showCursor && <ReferenceLine x={cursor} stroke="rgba(232,244,255,0.75)" strokeDasharray="2 3" />}
+        <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)', paddingTop: 6 }} />
+        <Line type="monotone" dataKey="d26" name="26 °C isotherm (D26)" stroke="var(--amber)" strokeWidth={2} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="mld" name="Mixed layer before" stroke="var(--teal)" strokeWidth={2} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="mldPost" name="Mixed layer after" stroke="var(--teal)" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+        {showCursor && <ReferenceLine x={cursor} stroke="var(--chart-ref)" strokeDasharray="2 3" />}
       </LineChart>
     </ResponsiveContainer>
   );
@@ -300,13 +300,13 @@ export default function CycloneReplay() {
     <div className="page cr-page">
       <div className="page-header">
         <div>
-          <h1 className="page-header__title">🌀 Cyclone Heat Potential Replay</h1>
+          <h1 className="page-header__title">Cyclone Heat Replay</h1>
           <p className="page-header__subtitle">
             Watch each storm cross the upper ocean: the warm pool it fed on, the cold wake it left behind,
             and the currents it set spinning. Export any replay as a video.
           </p>
         </div>
-        <div className="page-header__tag">🎯 INCOIS Mandate</div>
+        <div className="page-header__tag">INCOIS mandate</div>
       </div>
 
       {/* Storm picker */}

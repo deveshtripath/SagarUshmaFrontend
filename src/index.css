@@ -4,53 +4,134 @@
   padding: 0;
 }
 
+/*
+  Colour tokens. The legacy names (--cyan, --teal, --coral …) are kept so every
+  page keeps working; they now point at one calm palette that follows the
+  system appearance. Contrast figures are WCAG ratios against --bg-surface.
+*/
 :root {
-  /* Deep ocean palette */
-  --bg-deep:      #03070f;
-  --bg-abyss:     #060d1a;
-  --bg-surface:   #0b1628;
-  --bg-card:      #0f1f38;
-  --bg-card-hover:#132540;
-  --border:       rgba(0, 170, 255, 0.12);
-  --border-bright:rgba(0, 170, 255, 0.35);
+  color-scheme: light dark;
 
-  /* Accent system */
-  --cyan:         #00c8ff;
-  --cyan-dim:     rgba(0, 200, 255, 0.15);
-  --teal:         #00e5c0;
-  --teal-dim:     rgba(0, 229, 192, 0.12);
-  --amber:        #ffb347;
-  --amber-dim:    rgba(255, 179, 71, 0.15);
-  --coral:        #ff6b6b;
-  --coral-dim:    rgba(255, 107, 107, 0.12);
-  --violet:       #a78bfa;
-  --violet-dim:   rgba(167, 139, 250, 0.12);
+  /* Surfaces: base recedes, elevated advances */
+  --bg-deep:      #f3f5f7;
+  --bg-abyss:     #eceff2;
+  --bg-surface:   #ffffff;
+  --bg-card:      #ffffff;
+  --bg-card-hover:#f6f8fa;
+  --bg-fill:      #eef2f5;           /* grouped controls, inset wells */
+  --border:       rgba(22, 33, 43, 0.10);
+  --border-bright:rgba(22, 33, 43, 0.20);
+
+  /* Accent — used for selection and primary actions only */
+  --cyan:         #0b66c2;           /* 5.7:1 */
+  --cyan-dim:     rgba(11, 102, 194, 0.10);
+  --on-accent:    #ffffff;
+
+  /* Signal colours — each keeps one meaning across the app */
+  --teal:         #08705f;           /* cool / salinity / OK   5.9:1 */
+  --teal-dim:     rgba(8, 112, 95, 0.10);
+  --amber:        #94620a;           /* currents / caution     5.2:1 */
+  --amber-dim:    rgba(148, 98, 10, 0.10);
+  --coral:        #c2410c;           /* heat / temperature     5.2:1 */
+  --coral-dim:    rgba(194, 65, 12, 0.08);
+  --violet:       #6d4fd1;           /* wind                   5.7:1 */
+  --violet-dim:   rgba(109, 79, 209, 0.10);
+  --danger:       #c62828;
 
   /* Text */
-  --text-primary:   #e8f4ff;
-  --text-secondary: #7ba7c8;
-  --text-muted:     #3d6080;
-  --text-label:     #4a7a9b;
+  --text-primary:   #16212b;         /* 16.3:1 */
+  --text-secondary: #4b5b6b;         /*  7.0:1 */
+  --text-muted:     #5f6f80;         /*  5.2:1 */
+  --text-label:     #5f6f80;
 
-  /* Gradients */
-  --grad-card:  linear-gradient(135deg, #0f1f38 0%, #0b1628 100%);
-  --grad-cyan:  linear-gradient(135deg, rgba(0,200,255,0.2) 0%, rgba(0,229,192,0.1) 100%);
+  /* Charts */
+  --chart-grid:   rgba(22, 33, 43, 0.08);
+  --chart-axis:   #5f6f80;
+  --chart-ref:    rgba(22, 33, 43, 0.35);
+
+  /* Depth ramp — the one signature: warm surface to cold deep */
+  --grad-depth: linear-gradient(180deg, #f59e0b 0%, #ef6c3a 22%, #1f9ea8 58%, #1b4f8f 82%, #122a4f 100%);
+  --grad-card:  var(--bg-card);
+  --grad-cyan:  var(--cyan-dim);
   --grad-heat:  linear-gradient(180deg, #ff2d00 0%, #ff6b00 20%, #ffb300 40%, #00e5c0 70%, #0066ff 100%);
 
-  /* Glow effects */
-  --glow-cyan:  0 0 20px rgba(0, 200, 255, 0.25), 0 0 60px rgba(0, 200, 255, 0.08);
-  --glow-teal:  0 0 20px rgba(0, 229, 192, 0.25);
-  --glow-amber: 0 0 20px rgba(255, 179, 71, 0.25);
+  /* Elevation (replaces neon glow) */
+  --shadow-1:   0 1px 2px rgba(16, 24, 32, 0.06), 0 1px 1px rgba(16, 24, 32, 0.04);
+  --shadow-2:   0 6px 20px rgba(16, 24, 32, 0.10), 0 1px 3px rgba(16, 24, 32, 0.06);
+  --glow-cyan:  var(--shadow-2);
+  --glow-teal:  var(--shadow-2);
+  --glow-amber: var(--shadow-2);
 
-  /* Typography */
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  /* Typography — system faces first, Inter as the fallback on Windows/Linux */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 
-  /* Spacing */
-  --radius-sm:  6px;
-  --radius-md:  12px;
-  --radius-lg:  20px;
-  --radius-xl:  28px;
+  /* Shape */
+  --radius-sm:  8px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-deep:      #0d1319;
+    --bg-abyss:     #10171e;
+    --bg-surface:   #151d25;
+    --bg-card:      #151d25;
+    --bg-card-hover:#1a232d;
+    --bg-fill:      #1c2630;
+    --border:       rgba(232, 238, 243, 0.08);
+    --border-bright:rgba(232, 238, 243, 0.16);
+
+    --cyan:         #4db3ff;         /* 7.5:1 */
+    --cyan-dim:     rgba(77, 179, 255, 0.14);
+    --on-accent:    #06121d;
+
+    --teal:         #3fd0b4;
+    --teal-dim:     rgba(63, 208, 180, 0.12);
+    --amber:        #f2b84b;
+    --amber-dim:    rgba(242, 184, 75, 0.12);
+    --coral:        #ff8f66;
+    --coral-dim:    rgba(255, 143, 102, 0.10);
+    --violet:       #b79cff;
+    --violet-dim:   rgba(183, 156, 255, 0.12);
+    --danger:       #ff6b6b;
+
+    --text-primary:   #e8eef3;       /* 14.6:1 */
+    --text-secondary: #a3b3c2;       /*  7.9:1 */
+    --text-muted:     #8496a8;       /*  5.6:1 */
+    --text-label:     #8496a8;
+
+    --chart-grid:   rgba(232, 238, 243, 0.07);
+    --chart-axis:   #8496a8;
+    --chart-ref:    rgba(232, 238, 243, 0.35);
+
+    --shadow-1:   0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-2:   0 10px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --border:        rgba(22, 33, 43, 0.35);
+    --border-bright: rgba(22, 33, 43, 0.6);
+    --text-secondary:#2f3d4a;
+    --text-muted:    #3d4b58;
+    --text-label:    #3d4b58;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root {
+    --border:        rgba(232, 238, 243, 0.35);
+    --border-bright: rgba(232, 238, 243, 0.6);
+    --text-secondary:#cfd9e2;
+    --text-muted:    #b6c3cf;
+    --text-label:    #b6c3cf;
+  }
 }
 
 html, body {
@@ -59,8 +140,10 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -69,31 +152,73 @@ html, body {
   flex-direction: column;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-deep); }
-::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+button, input, select, textarea { font: inherit; color: inherit; }
 
-/* Leaflet overrides */
+::selection { background: var(--cyan-dim); }
+
+/* Keyboard focus is always visible; pointer clicks stay clean */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* Leaflet */
 .leaflet-container {
-  background: #03070f !important;
+  background: var(--bg-fill) !important;
   font-family: var(--font-sans) !important;
 }
-.leaflet-control-zoom a {
-  background: var(--bg-card) !important;
-  color: var(--cyan) !important;
-  border-color: var(--border) !important;
+.leaflet-bar {
+  border: none !important;
+  box-shadow: var(--shadow-2) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
 }
+.leaflet-control-zoom a {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 30px !important;
+}
+.leaflet-control-zoom a:hover { background: var(--bg-card-hover) !important; }
 .leaflet-control-attribution {
-  background: rgba(3,7,15,0.7) !important;
+  background: color-mix(in srgb, var(--bg-surface) 85%, transparent) !important;
   color: var(--text-muted) !important;
   font-size: 10px !important;
 }
-.leaflet-popup-content-wrapper {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border-bright) !important;
+.leaflet-control-attribution a { color: var(--text-secondary) !important; }
+.leaflet-popup-content-wrapper,
+.leaflet-tooltip {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border) !important;
   color: var(--text-primary) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--glow-cyan) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-2) !important;
 }
-.leaflet-popup-tip { background: var(--bg-card) !important; }
+.leaflet-popup-tip { background: var(--bg-surface) !important; }
+.leaflet-tooltip-top::before { border-top-color: var(--bg-surface) !important; }
+.leaflet-tooltip-bottom::before { border-bottom-color: var(--bg-surface) !important; }
+.leaflet-tooltip-left::before { border-left-color: var(--bg-surface) !important; }
+.leaflet-tooltip-right::before { border-right-color: var(--bg-surface) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

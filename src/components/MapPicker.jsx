@@ -24,7 +24,7 @@ function ClickCatcher({ onPick }) {
 
 export default function MapPicker({ position, onPick, height = '420px', center = [15, 75], zoom = 4 }) {
   return (
-    <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(0,170,255,0.2)', boxShadow: '0 0 30px rgba(0,200,255,0.08)' }}>
+    <div className="map-picker">
       <MapContainer
         center={center}
         zoom={zoom}
